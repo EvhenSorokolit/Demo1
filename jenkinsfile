@@ -1,0 +1,48 @@
+pipeline{
+    agent any
+
+    stages{
+        stage ('SCM chackout'){
+            steps{
+                git  credentialsId: 'Git-jenkins', url: 'git@github.com:EvhenSorokolit/Demo1.git'
+            }
+         }
+          stage ('Ansible prepare'){
+            steps{
+
+              ansiblePlaybook credentialsId: 'aws-dev', disableHostKeyChecking: true, installation: 'ansible', inventory: 'prod.inv', playbook: 'playboock.yml'
+            }
+         }
+
+         stage ('build image'){
+            steps{
+                sh ' sudo docker system prune -af'
+                sh ' sudo docker build -t sorokolitevhen/demo1:${BUILD_ID} .'
+                }
+
+            }
+
+            stage ('PUSH image'){
+
+            steps{
+                 withCredentials([string(credentialsId: 'docker-hub', variable: 'dockerHubPwd')]) {
+                    sh " sudo docker login  -u sorokolitevhen -p ${dockerHubPwd}"
+                 }
+                sh 'sudo docker push sorokolitevhen/demo1:${BUILD_ID}'
+                }
+
+            }
+              stage ('Deploy on dev serv'){
+                  steps{
+                      script{
+                      def dockerRun = ' sudo docker run -d -p 80:80 sorokolitevhen/demo1:${BUILD_ID}'
+                        sshagent(['aws-dev']) {
+                          sh "ssh -o StrictHostKeyChecking=no ubuntu@3.120.132.174 ${dockerRun}"
+                        }
+                      }
+
+                  }
+            }
+         }
+
+    }
