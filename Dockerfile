@@ -1,4 +1,4 @@
-FROM alpine
+FROM alpine:latest
 RUN apk add apache2 \
 && apk add openrc \
 && rm -rf /etc/apk/cache
