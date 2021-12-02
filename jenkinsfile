@@ -1,6 +1,6 @@
 pipeline{
     agent any
-
+    
     stages{
         stage ('SCM chackout'){
             steps{
@@ -9,40 +9,47 @@ pipeline{
          }
           stage ('Ansible prepare'){
             steps{
-
+                
               ansiblePlaybook credentialsId: 'aws-dev', disableHostKeyChecking: true, installation: 'ansible', inventory: 'prod.inv', playbook: 'playboock.yml'
             }
          }
-
-         stage ('build image'){
+         
+         stage ('Build image'){
             steps{
                 sh ' sudo docker system prune -af'
                 sh ' sudo docker build -t sorokolitevhen/demo1:${BUILD_ID} .'
                 }
-
+            
             }
-
+            
+            
+            
             stage ('PUSH image'){
-
+               
             steps{
                  withCredentials([string(credentialsId: 'docker-hub', variable: 'dockerHubPwd')]) {
                     sh " sudo docker login  -u sorokolitevhen -p ${dockerHubPwd}"
                  }
-                sh 'sudo docker push sorokolitevhen/demo1:${BUILD_ID}'
+                sh "sudo docker push sorokolitevhen/demo1:${BUILD_ID}"
                 }
-
+           
             }
               stage ('Deploy on dev serv'){
                   steps{
-                      script{
-                      def dockerRun = ' sudo docker run -d -p 80:80 sorokolitevhen/demo1:${BUILD_ID}'
+                      script{                                           
                         sshagent(['aws-dev']) {
-                          sh "ssh -o StrictHostKeyChecking=no ubuntu@3.120.132.174 ${dockerRun}"
+                            sh """
+                            ssh -tt -o StrictHostKeyChecking=no ubuntu@3.120.132.174 <<EOF
+                            sudo docker stop webapp                            
+                            sudo  docker system prune -af
+                            sudo docker run -d -p 80:80 --name webapp sorokolitevhen/demo1:${BUILD_ID}
+                            exit
+                            EOF"""
                         }
-                      }
-
+                 }
+                      
                   }
-            }
+            }    
          }
 
     }
